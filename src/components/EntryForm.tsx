@@ -35,17 +35,19 @@ export function EntryForm({ editingEntry, onSaved }: EntryFormProps) {
 
     if (!user) return;
 
+    // Create entry data object with the date and values
+    const entryData = {
+      date: entryDate,
+      values
+    };
+
     if (editingEntry) {
-      await updateEntry(editingEntry.id, {
-        date: entryDate,
-        values
-      });
+      await updateEntry(editingEntry.id, entryData);
     } else {
       await addEntry({
         template_id: activeTemplate.id,
         user_id: user.id,
-        date: entryDate,
-        values
+        ...entryData
       });
     }
 

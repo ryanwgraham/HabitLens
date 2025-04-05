@@ -3,6 +3,7 @@ import { Send, Sparkles, History } from 'lucide-react';
 import { useTrackingStore } from '../store/trackingStore';
 import { supabase } from '../lib/supabase';
 import OpenAI from 'openai';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
@@ -101,7 +102,7 @@ export function Analysis() {
       // Prepare messages array with system message and data context
       const systemMessage: Message = {
         role: 'system',
-        content: 'You are a data analysis assistant integrated within a personal tracking application. Users input diverse data through customized tracking templates, covering activities such as sleep patterns, exercise, diet, mood, and social interactions. Your primary function is to analyze this logged data, identify meaningful patterns, correlations, and trends, and provide insightful, actionable feedback and tailored recommendations. Always interpret user data thoughtfully, clearly explaining your insights and suggestions in an empathetic, encouraging, and supportive manner. When providing recommendations, consider the users historical data and context to ensure relevance and personalization.',
+        content: 'You are a data analysis assistant integrated within a personal tracking application. Users input diverse data through customized tracking templates, covering activities such as sleep patterns, exercise, diet, mood, and social interactions. Your primary function is to analyze this logged data, identify meaningful patterns, correlations, and trends, and provide insightful, actionable feedback and tailored recommendations. Always interpret user data thoughtfully, clearly explaining your insights and suggestions in an empathetic, encouraging, and supportive manner. When providing recommendations, consider the users historical data and context to ensure relevance and personalization. Format your responses using Markdown for better readability.',
       };
 
       const contextMessage: Message = {
@@ -172,6 +173,7 @@ export function Analysis() {
       { role: 'user', content: analysis.query },
       { role: 'assistant', content: analysis.response }
     ]);
+    setShowHistory(false);
   };
 
   if (!userSettings?.openai_api_key) {
@@ -184,7 +186,7 @@ export function Analysis() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col min-h-0">
       <div className="flex items-center space-x-4 mb-6">
         <div className="flex-1">
           <div className="relative">
@@ -223,57 +225,69 @@ export function Analysis() {
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-xl">
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-4">
           {error}
         </div>
       )}
 
-      {showHistory ? (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-800">Previous Analyses</h3>
-          {previousAnalyses.length === 0 ? (
-            <p className="text-gray-500">No previous analyses yet</p>
-          ) : (
-            previousAnalyses.map((analysis, index) => (
+      <div className="flex-1 overflow-y-auto">
+        {showHistory ? (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800">Previous Analyses</h3>
+            {previousAnalyses.length === 0 ? (
+              <p className="text-gray-500">No previous analyses yet</p>
+            ) : (
+              previousAnalyses.map((analysis, index) => (
+                <div
+                  key={index}
+                  className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => loadPreviousAnalysis(analysis)}
+                >
+                  <p className="font-medium text-gray-800 mb-2">{analysis.query}</p>
+                  <div className="text-gray-600 line-clamp-2">
+                    <ReactMarkdown>{analysis.response}</ReactMarkdown>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : messages.length > 0 ? (
+          <div className="space-y-4">
+            {messages.filter(m => m.role !== 'system').map((message, index) => (
               <div
                 key={index}
-                className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => loadPreviousAnalysis(analysis)}
+                className={`p-4 rounded-xl ${
+                  message.role === 'user'
+                    ? 'bg-primary/5 ml-12'
+                    : 'bg-white shadow-sm border border-gray-100 mr-12'
+                }`}
               >
-                <p className="font-medium text-gray-800 mb-2">{analysis.query}</p>
-                <p className="text-gray-600 line-clamp-2">{analysis.response}</p>
-              </div>
-            ))
-          )}
-        </div>
-      ) : messages.length > 0 ? (
-        <div className="space-y-4">
-          {messages.filter(m => m.role !== 'system').map((message, index) => (
-            <div
-              key={index}
-              className={`p-4 rounded-xl ${
-                message.role === 'user'
-                  ? 'bg-primary/5 ml-12'
-                  : 'bg-white shadow-sm border border-gray-100 mr-12'
-              }`}
-            >
-              {message.role === 'assistant' && (
-                <div className="flex items-center space-x-2 mb-2 text-primary">
-                  <Sparkles className="h-5 w-5" />
-                  <h3 className="font-semibold">Analysis</h3>
+                {message.role === 'assistant' && (
+                  <div className="flex items-center space-x-2 mb-2 text-primary">
+                    <Sparkles className="h-5 w-5" />
+                    <h3 className="font-semibold">Analysis</h3>
+                  </div>
+                )}
+                <div className="prose prose-sm max-w-none">
+                  {message.role === 'assistant' ? (
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  ) : (
+                    <p>{message.content}</p>
+                  )}
                 </div>
-              )}
-              <div className="prose prose-sm max-w-none">
-                {message.content.split('\n').map((paragraph, i) => (
-                  <p key={i} className="mb-4 last:mb-0">
-                    {paragraph}
-                  </p>
-                ))}
               </div>
-            </div>
-          ))}
-        </div>
-      ) : null}
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <Sparkles className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+            <p>Ask a question about your data to get started!</p>
+            <p className="text-sm mt-2">
+              Try asking about trends, patterns, or insights from your entries.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

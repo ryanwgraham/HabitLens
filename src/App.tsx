@@ -177,10 +177,8 @@ function App() {
                   </div>
                 </div>
               )}
-            </div>
 
-            {activeTemplate && (
-              <div className="space-y-8">
+              {activeTemplate && (
                 <div className="bg-white/80 backdrop-blur-sm shadow-lg rounded-2xl p-6 border-2 border-accent-purple/20 hover:border-accent-purple/40 transition-colors">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold text-gray-800">
@@ -202,11 +200,13 @@ function App() {
                   </div>
                   {showNewEntry ? <EntryForm /> : <EntriesList />}
                 </div>
+              )}
+            </div>
 
-                <div className="bg-white/80 backdrop-blur-sm shadow-lg rounded-2xl p-6 border-2 border-accent-pink/20 hover:border-accent-pink/40 transition-colors">
-                  <h2 className="text-2xl font-bold text-gray-800 mb-6">Analyze Data</h2>
-                  <Analysis />
-                </div>
+            {activeTemplate && (
+              <div className="bg-white/80 backdrop-blur-sm shadow-lg rounded-2xl p-6 border-2 border-accent-pink/20 hover:border-accent-pink/40 transition-colors self-start">
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">Analyze Data</h2>
+                <Analysis />
               </div>
             )}
           </div>

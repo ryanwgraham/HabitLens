@@ -115,6 +115,10 @@ export function TemplateForm({ editingTemplate, onCancel }: TemplateFormProps) {
     if (editingTemplate) {
       setName(editingTemplate.name);
       setFields(editingTemplate.fields);
+    } else {
+      // Reset form when not editing
+      setName('');
+      setFields([]);
     }
   }, [editingTemplate]);
 
@@ -171,6 +175,13 @@ export function TemplateForm({ editingTemplate, onCancel }: TemplateFormProps) {
       setName('');
       setFields([]);
     }
+  };
+
+  const handleCancel = () => {
+    // Reset form state
+    setName('');
+    setFields([]);
+    onCancel?.();
   };
 
   return (
@@ -232,7 +243,7 @@ export function TemplateForm({ editingTemplate, onCancel }: TemplateFormProps) {
         {editingTemplate && (
           <button
             type="button"
-            onClick={onCancel}
+            onClick={handleCancel}
             className="inline-flex items-center px-4 py-2 border-2 border-gray-300 text-sm font-medium rounded-xl text-gray-700 hover:bg-gray-50"
           >
             <X className="h-4 w-4 mr-2" />
