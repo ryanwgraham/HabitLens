@@ -1,13 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useTrackingStore } from '../store/trackingStore';
 import { supabase } from '../lib/supabase';
 import { Calendar, Star } from 'lucide-react';
+import { Entry } from '../types';
 
-export function EntryForm() {
-  const { activeTemplate, addEntry, loading } = useTrackingStore();
+interface EntryFormProps {
+  editingEntry?: Entry | null;
+  onSaved?: () => void;
+}
+
+export function EntryForm({ editingEntry, onSaved }: EntryFormProps) {
+  const { activeTemplate, addEntry, updateEntry, loading } = useTrackingStore();
   const [values, setValues] = useState<Record<string, any>>({});
   const [entryDate, setEntryDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+
+  useEffect(() => {
+    if (editingEntry) {
+      setValues(editingEntry.values);
+      setEntryDate(editingEntry.date);
+    }
+  }, [editingEntry]);
 
   if (!activeTemplate) {
     return <div>Please select a template first</div>;
@@ -22,14 +35,22 @@ export function EntryForm() {
 
     if (!user) return;
 
-    await addEntry({
-      template_id: activeTemplate.id,
-      user_id: user.id,
-      date: entryDate,
-      values
-    });
+    if (editingEntry) {
+      await updateEntry(editingEntry.id, {
+        date: entryDate,
+        values
+      });
+    } else {
+      await addEntry({
+        template_id: activeTemplate.id,
+        user_id: user.id,
+        date: entryDate,
+        values
+      });
+    }
 
     setValues({});
+    onSaved?.();
   };
 
   const handleInputChange = (fieldId: string, value: any) => {
@@ -115,7 +136,7 @@ export function EntryForm() {
         disabled={loading}
         className="w-full px-4 py-3 bg-gradient-to-r from-primary to-accent-purple text-sm font-medium rounded-xl text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
       >
-        {loading ? 'Saving...' : 'Save Entry'}
+        {loading ? 'Saving...' : editingEntry ? 'Update Entry' : 'Save Entry'}
       </button>
     </form>
   );

@@ -15,6 +15,8 @@ interface TrackingState {
   updateTemplate: (id: string, updates: Partial<Template>) => Promise<void>;
   deleteTemplate: (id: string) => Promise<void>;
   addEntry: (entry: Omit<Entry, 'id' | 'createdAt'>) => Promise<void>;
+  updateEntry: (id: string, updates: Partial<Entry>) => Promise<void>;
+  deleteEntry: (id: string) => Promise<void>;
   addAnalysis: (analysis: Omit<ChatGPTAnalysis, 'timestamp'>) => Promise<void>;
   setActiveTemplate: (template: Template | null) => void;
   getEntriesByTemplate: (templateId: string) => Entry[];
@@ -134,6 +136,46 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
 
       if (error) throw error;
       set((state) => ({ entries: [...state.entries, data] }));
+    } catch (error) {
+      set({ error: (error as Error).message });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  updateEntry: async (id, updates) => {
+    set({ loading: true, error: null });
+    try {
+      const { data, error } = await supabase
+        .from('entries')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      set((state) => ({
+        entries: state.entries.map((e) => (e.id === id ? data : e)),
+      }));
+    } catch (error) {
+      set({ error: (error as Error).message });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  deleteEntry: async (id) => {
+    set({ loading: true, error: null });
+    try {
+      const { error } = await supabase
+        .from('entries')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      set((state) => ({
+        entries: state.entries.filter((e) => e.id !== id),
+      }));
     } catch (error) {
       set({ error: (error as Error).message });
     } finally {
