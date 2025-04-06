@@ -1,6 +1,7 @@
 export interface Template {
   id: string;
   name: string;
+  goal?: string;
   fields: Field[];
   createdAt: string;
 }

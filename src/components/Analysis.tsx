@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Sparkles, History } from 'lucide-react';
+import { Send, Sparkles, History, Save, Trash2 } from 'lucide-react';
 import { useTrackingStore } from '../store/trackingStore';
 import { supabase } from '../lib/supabase';
 import OpenAI from 'openai';
@@ -10,10 +10,16 @@ interface Message {
   content: string;
 }
 
+interface SavedAnalysis {
+  id: string;
+  query: string;
+  response: string;
+}
+
 export function Analysis() {
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [previousAnalyses, setPreviousAnalyses] = useState<Array<{ query: string; response: string }>>([]);
+  const [previousAnalyses, setPreviousAnalyses] = useState<SavedAnalysis[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const { activeTemplate } = useTrackingStore();
   const [loading, setLoading] = useState(false);
@@ -23,6 +29,32 @@ export function Analysis() {
   useEffect(() => {
     fetchUserSettings();
   }, []);
+
+  useEffect(() => {
+    if (activeTemplate) {
+      fetchPreviousAnalyses();
+    }
+  }, [activeTemplate]);
+
+  const fetchPreviousAnalyses = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !activeTemplate) return;
+
+      const { data, error } = await supabase
+        .from('analyses')
+        .select('id, query, response')
+        .eq('template_id', activeTemplate.id)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPreviousAnalyses(data || []);
+    } catch (err) {
+      console.error('Error fetching previous analyses:', err);
+      setError('Failed to load previous analyses');
+    }
+  };
 
   const fetchUserSettings = async () => {
     try {
@@ -40,6 +72,49 @@ export function Analysis() {
     } catch (err) {
       console.error('Error fetching user settings:', err);
       setError('Failed to load settings. Please configure your OpenAI API key in settings.');
+    }
+  };
+
+  const saveAnalysis = async (query: string, response: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !activeTemplate) return;
+
+      const { data, error } = await supabase
+        .from('analyses')
+        .insert({
+          template_id: activeTemplate.id,
+          user_id: user.id,
+          query,
+          response,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update the previous analyses list with the new analysis including its ID
+      setPreviousAnalyses(prev => [{ id: data.id, query, response }, ...prev]);
+    } catch (err) {
+      console.error('Error saving analysis:', err);
+      setError('Failed to save analysis. Please try again.');
+    }
+  };
+
+  const deleteAnalysis = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('analyses')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Update the UI by removing the deleted analysis
+      setPreviousAnalyses(prev => prev.filter(analysis => analysis.id !== id));
+    } catch (err) {
+      console.error('Error deleting analysis:', err);
+      setError('Failed to delete analysis. Please try again.');
     }
   };
 
@@ -92,6 +167,7 @@ export function Analysis() {
       // Create analysis prompt
       const dataContext = `
         Template: ${activeTemplate.name}
+        ${activeTemplate.goal ? `\nGoal: ${activeTemplate.goal}\n` : ''}
         Number of entries: ${entries.length}
         Date range: ${entries[entries.length - 1]?.date} to ${entries[0]?.date}
         
@@ -102,7 +178,11 @@ export function Analysis() {
       // Prepare messages array with system message and data context
       const systemMessage: Message = {
         role: 'system',
-        content: 'You are a data analysis assistant integrated within a personal tracking application. Users input diverse data through customized tracking templates, covering activities such as sleep patterns, exercise, diet, mood, and social interactions. Your primary function is to analyze this logged data, identify meaningful patterns, correlations, and trends, and provide insightful, actionable feedback and tailored recommendations. Always interpret user data thoughtfully, clearly explaining your insights and suggestions in an empathetic, encouraging, and supportive manner. When providing recommendations, consider the users historical data and context to ensure relevance and personalization. Format your responses using Markdown for better readability.',
+        content: `You are a data analysis assistant integrated within a personal tracking application. Users input diverse data through customized tracking templates, covering activities such as sleep patterns, exercise, diet, mood, and social interactions. 
+        
+        ${activeTemplate.goal ? `The user's goal for this tracking template is: "${activeTemplate.goal}". Keep this goal in mind when analyzing the data and providing recommendations.` : ''}
+        
+        Your primary function is to analyze this logged data, identify meaningful patterns, correlations, and trends, and provide insightful, actionable feedback and tailored recommendations. Always interpret user data thoughtfully, clearly explaining your insights and suggestions in an empathetic, encouraging, and supportive manner. When providing recommendations, consider the user's historical data and context to ensure relevance and personalization. Format your responses using Markdown for better readability.`,
       };
 
       const contextMessage: Message = {
@@ -138,19 +218,6 @@ export function Analysis() {
       ];
       setMessages(newMessages);
 
-      // Update previous analyses
-      setPreviousAnalyses(prev => [{ query, response: analysisResponse }, ...prev]);
-
-      // Save analysis to database
-      await supabase
-        .from('analyses')
-        .insert({
-          template_id: activeTemplate.id,
-          user_id: user.id,
-          query,
-          response: analysisResponse,
-        });
-
       setQuery('');
     } catch (err) {
       console.error('Analysis error:', err);
@@ -167,7 +234,7 @@ export function Analysis() {
     }
   };
 
-  const loadPreviousAnalysis = (analysis: { query: string; response: string }) => {
+  const loadPreviousAnalysis = (analysis: SavedAnalysis) => {
     setQuery(analysis.query);
     setMessages([
       { role: 'user', content: analysis.query },
@@ -237,14 +304,23 @@ export function Analysis() {
             {previousAnalyses.length === 0 ? (
               <p className="text-gray-500">No previous analyses yet</p>
             ) : (
-              previousAnalyses.map((analysis, index) => (
+              previousAnalyses.map((analysis) => (
                 <div
-                  key={index}
-                  className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => loadPreviousAnalysis(analysis)}
+                  key={analysis.id}
+                  className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow group"
                 >
-                  <p className="font-medium text-gray-800 mb-2">{analysis.query}</p>
-                  <div className="text-gray-600 line-clamp-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-gray-800 cursor-pointer" onClick={() => loadPreviousAnalysis(analysis)}>
+                      {analysis.query}
+                    </h4>
+                    <button
+                      onClick={() => deleteAnalysis(analysis.id)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="text-gray-600 line-clamp-2 cursor-pointer" onClick={() => loadPreviousAnalysis(analysis)}>
                     <ReactMarkdown>{analysis.response}</ReactMarkdown>
                   </div>
                 </div>
@@ -263,9 +339,18 @@ export function Analysis() {
                 }`}
               >
                 {message.role === 'assistant' && (
-                  <div className="flex items-center space-x-2 mb-2 text-primary">
-                    <Sparkles className="h-5 w-5" />
-                    <h3 className="font-semibold">Analysis</h3>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2 text-primary">
+                      <Sparkles className="h-5 w-5" />
+                      <h3 className="font-semibold">Analysis</h3>
+                    </div>
+                    <button
+                      onClick={() => saveAnalysis(messages[messages.length - 2].content, message.content)}
+                      className="inline-flex items-center px-3 py-1 text-sm rounded-lg text-primary hover:bg-primary/5"
+                    >
+                      <Save className="h-4 w-4 mr-1" />
+                      Save Analysis
+                    </button>
                   </div>
                 )}
                 <div className="prose prose-sm max-w-none">

@@ -25,6 +25,7 @@ interface TemplateFormProps {
   editingTemplate?: {
     id: string;
     name: string;
+    goal?: string;
     fields: Field[];
   } | null;
   onCancel?: () => void;
@@ -102,6 +103,7 @@ function SortableField({ field, index, updateField, removeField }: SortableField
 export function TemplateForm({ editingTemplate, onCancel }: TemplateFormProps) {
   const { addTemplate, updateTemplate, loading } = useTrackingStore();
   const [name, setName] = useState('');
+  const [goal, setGoal] = useState('');
   const [fields, setFields] = useState<Field[]>([]);
 
   const sensors = useSensors(
@@ -114,10 +116,11 @@ export function TemplateForm({ editingTemplate, onCancel }: TemplateFormProps) {
   useEffect(() => {
     if (editingTemplate) {
       setName(editingTemplate.name);
+      setGoal(editingTemplate.goal || '');
       setFields(editingTemplate.fields);
     } else {
-      // Reset form when not editing
       setName('');
+      setGoal('');
       setFields([]);
     }
   }, [editingTemplate]);
@@ -164,22 +167,24 @@ export function TemplateForm({ editingTemplate, onCancel }: TemplateFormProps) {
     if (!user) return;
 
     if (editingTemplate) {
-      await updateTemplate(editingTemplate.id, { name, fields });
+      await updateTemplate(editingTemplate.id, { name, goal, fields });
       onCancel?.();
     } else {
       await addTemplate({
         name,
+        goal,
         fields,
         user_id: user.id
       });
       setName('');
+      setGoal('');
       setFields([]);
     }
   };
 
   const handleCancel = () => {
-    // Reset form state
     setName('');
+    setGoal('');
     setFields([]);
     onCancel?.();
   };
@@ -196,6 +201,18 @@ export function TemplateForm({ editingTemplate, onCancel }: TemplateFormProps) {
           onChange={(e) => setName(e.target.value)}
           className="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary/20"
           required
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          Template Goal
+        </label>
+        <textarea
+          value={goal}
+          onChange={(e) => setGoal(e.target.value)}
+          placeholder="What's the purpose of tracking this data? (e.g., 'Improve sleep quality' or 'Track fitness progress')"
+          className="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary/20 min-h-[80px]"
         />
       </div>
 
