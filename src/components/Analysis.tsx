@@ -235,7 +235,7 @@ export function Analysis() {
   };
 
   const loadPreviousAnalysis = (analysis: SavedAnalysis) => {
-    setQuery(analysis.query);
+    // Only set the messages, don't update the query input
     setMessages([
       { role: 'user', content: analysis.query },
       { role: 'assistant', content: analysis.response }
